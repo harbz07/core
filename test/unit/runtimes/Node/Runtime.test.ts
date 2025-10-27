@@ -43,6 +43,7 @@ describe('Runtimes - Node - Runtime', () => {
     let logger: any;
 
     beforeEach(() => {
+        vi.clearAllMocks();
         emitError = null;
         runtime = new NodeRuntime();
         logger = {

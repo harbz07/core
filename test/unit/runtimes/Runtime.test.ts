@@ -25,7 +25,9 @@ describe('Modules - JSX - getRuntime', () => {
         globalThis.Bun = {};
 
         vi.mock('../../../lib/runtimes/Bun/Runtime.js', () => ({
-            BunRuntime: vi.fn().mockImplementation(() => ({name: 'BunRuntime'})),
+            BunRuntime: vi.fn().mockImplementation(function BunRuntime(this: any) {
+                this.name = 'BunRuntime';
+            }),
         }));
 
         const runtime = await getRuntime();
@@ -40,7 +42,9 @@ describe('Modules - JSX - getRuntime', () => {
         vi.spyOn(process, 'versions', 'get').mockReturnValue({node: '22.0.0'});
 
         vi.doMock('../../../lib/runtimes/Node/Runtime.js', () => ({
-            NodeRuntime: vi.fn().mockImplementation(() => ({name: 'NodeRuntime'})),
+            NodeRuntime: vi.fn().mockImplementation(function NodeRuntime(this: any) {
+                this.name = 'NodeRuntime';
+            }),
         }));
 
         const {getRuntime} = await import('../../../lib/runtimes/Runtime');

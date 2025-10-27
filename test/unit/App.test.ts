@@ -731,8 +731,8 @@ describe('App', () => {
     });
 
     describe('limit', () => {
-        let limitSpy;
-        let limitMock;
+        let limitSpy: any;
+        let limitMock: any;
         const dummyMiddleware = vi.fn();
 
         beforeEach(() => {
@@ -1359,7 +1359,7 @@ describe('App', () => {
                         description: null,
                         fingerprint: null,
                         handler: m1,
-                        name: 'spy',
+                        name: 'Mock',
                     },
                 ],
                 name: 'healthcheck',
@@ -1379,7 +1379,7 @@ describe('App', () => {
                         description: null,
                         fingerprint: null,
                         handler: m1,
-                        name: 'spy',
+                        name: 'Mock',
                     },
                 ],
                 name: 'HEAD_healthcheck',

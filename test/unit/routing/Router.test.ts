@@ -154,8 +154,8 @@ describe('routing - Router', () => {
         let router: Router<any, any>;
         let tree: RouteTree<any>;
         const dummyMiddleware = vi.fn();
-        let limitSpy;
-        let limitMock;
+        let limitSpy: any;
+        let limitMock: any;
 
         beforeEach(() => {
             tree = new RouteTree();
@@ -209,7 +209,7 @@ describe('routing - Router', () => {
             const route = tree.stack.find(r => r.path === '/api/protected' && r.method === 'GET');
             expect(route?.middleware).toEqual([
                 {
-                    name: 'spy',
+                    name: 'Mock',
                     description: null,
                     fingerprint: null,
                     handler: dummyMiddleware,
@@ -237,19 +237,19 @@ describe('routing - Router', () => {
             const route = tree.stack.find(r => r.path === '/api/chained' && r.method === 'POST');
             expect(route?.middleware).toEqual([
                 {
-                    name: 'spy',
+                    name: 'Mock',
                     description: null,
                     fingerprint: null,
                     handler: m1,
                 },
                 {
-                    name: 'spy',
+                    name: 'Mock',
                     description: null,
                     fingerprint: null,
                     handler: dummyMiddleware,
                 },
                 {
-                    name: 'spy',
+                    name: 'Mock',
                     description: null,
                     fingerprint: null,
                     handler: m2,
@@ -278,7 +278,7 @@ describe('routing - Router', () => {
 
             expect(getRoute?.middleware).toEqual([
                 {
-                    name: 'spy',
+                    name: 'Mock',
                     description: null,
                     fingerprint: null,
                     handler: dummyMiddleware,
@@ -286,7 +286,7 @@ describe('routing - Router', () => {
             ]);
             expect(postRoute?.middleware).toEqual([
                 {
-                    name: 'spy',
+                    name: 'Mock',
                     description: null,
                     fingerprint: null,
                     handler: dummyMiddleware,
@@ -1182,8 +1182,8 @@ describe('routing - Router', () => {
                 fn: handler,
                 timeout: null,
                 middleware: [
-                    {name: 'spy', description: null, fingerprint: null, handler: m1},
-                    {name: 'spy', description: null, fingerprint: null, handler: m2},
+                    {name: 'Mock', description: null, fingerprint: null, handler: m1},
+                    {name: 'Mock', description: null, fingerprint: null, handler: m2},
                 ],
                 bodyParser: null,
                 name: 'GET_/hello/chained',
@@ -1210,8 +1210,8 @@ describe('routing - Router', () => {
                 fn: handler,
                 timeout: null,
                 middleware: [
-                    {name: 'spy', description: null, fingerprint: null, handler: m1},
-                    {name: 'spy', description: null, fingerprint: null, handler: m2},
+                    {name: 'Mock', description: null, fingerprint: null, handler: m1},
+                    {name: 'Mock', description: null, fingerprint: null, handler: m2},
                 ],
                 bodyParser: null,
                 name: 'HEAD_/hello/chained',
@@ -1396,8 +1396,8 @@ describe('routing - Router', () => {
                 fn: handler,
                 timeout: null,
                 middleware: [
-                    {name: 'spy', description: null, fingerprint: null, handler: m1},
-                    {name: 'spy', description: null, fingerprint: null, handler: m2},
+                    {name: 'Mock', description: null, fingerprint: null, handler: m1},
+                    {name: 'Mock', description: null, fingerprint: null, handler: m2},
                 ],
                 bodyParser: null,
                 name: 'POST_/hello/chained',
@@ -1596,8 +1596,8 @@ describe('routing - Router', () => {
                 fn: handler,
                 timeout: null,
                 middleware: [
-                    {name: 'spy', description: null, fingerprint: null, handler: m1},
-                    {name: 'spy', description: null, fingerprint: null, handler: m2},
+                    {name: 'Mock', description: null, fingerprint: null, handler: m1},
+                    {name: 'Mock', description: null, fingerprint: null, handler: m2},
                 ],
                 bodyParser: null,
                 name: 'PUT_/hello/chained',
@@ -1796,8 +1796,8 @@ describe('routing - Router', () => {
                 fn: handler,
                 timeout: null,
                 middleware: [
-                    {name: 'spy', description: null, fingerprint: null, handler: m1},
-                    {name: 'spy', description: null, fingerprint: null, handler: m2},
+                    {name: 'Mock', description: null, fingerprint: null, handler: m1},
+                    {name: 'Mock', description: null, fingerprint: null, handler: m2},
                 ],
                 bodyParser: null,
                 name: 'PATCH_/hello/chained',
@@ -1996,8 +1996,8 @@ describe('routing - Router', () => {
                 fn: handler,
                 timeout: null,
                 middleware: [
-                    {name: 'spy', description: null, fingerprint: null, handler: m1},
-                    {name: 'spy', description: null, fingerprint: null, handler: m2},
+                    {name: 'Mock', description: null, fingerprint: null, handler: m1},
+                    {name: 'Mock', description: null, fingerprint: null, handler: m2},
                 ],
                 bodyParser: null,
                 name: 'DELETE_/hello/chained',
@@ -2102,7 +2102,7 @@ describe('routing - Router', () => {
 
             const expectedMiddleware = [
                 {
-                    name: 'spy',
+                    name: 'Mock',
                     description: null,
                     fingerprint: null,
                     handler: m1,
@@ -2190,7 +2190,7 @@ describe('routing - Router', () => {
                 timeout: null,
                 tree,
                 middleware: [],
-                rateLimit: limitMock,
+                rateLimit: limitMock as unknown as any,
                 bodyParser: null,
             });
         });
@@ -2241,30 +2241,30 @@ describe('routing - Router', () => {
             const productsPost = stack.find(r => r.path === '/api/products' && r.method === 'POST');
 
             expect(getUsers?.middleware).toEqual([
-                {name: 'spy', description: null, fingerprint: null, handler: m1},
-                {name: 'spy', description: null, fingerprint: null, handler: dummyMiddleware},
+                {name: 'Mock', description: null, fingerprint: null, handler: m1},
+                {name: 'Mock', description: null, fingerprint: null, handler: dummyMiddleware},
             ]);
             expect(postUsers?.middleware).toEqual([
-                {name: 'spy', description: null, fingerprint: null, handler: m1},
-                {name: 'spy', description: null, fingerprint: null, handler: dummyMiddleware},
+                {name: 'Mock', description: null, fingerprint: null, handler: m1},
+                {name: 'Mock', description: null, fingerprint: null, handler: dummyMiddleware},
             ]);
             expect(putUsers?.middleware).toEqual([
-                {name: 'spy', description: null, fingerprint: null, handler: m1},
-                {name: 'spy', description: null, fingerprint: null, handler: dummyMiddleware},
+                {name: 'Mock', description: null, fingerprint: null, handler: m1},
+                {name: 'Mock', description: null, fingerprint: null, handler: dummyMiddleware},
             ]);
             expect(adminDashboard?.middleware).toEqual([
-                {name: 'spy', description: null, fingerprint: null, handler: m1},
-                {name: 'spy', description: null, fingerprint: null, handler: dummyMiddleware},
-                {name: 'spy', description: null, fingerprint: null, handler: m2},
+                {name: 'Mock', description: null, fingerprint: null, handler: m1},
+                {name: 'Mock', description: null, fingerprint: null, handler: dummyMiddleware},
+                {name: 'Mock', description: null, fingerprint: null, handler: m2},
             ]);
             expect(productsGet?.middleware).toEqual([
-                {name: 'spy', description: null, fingerprint: null, handler: m1},
-                {name: 'spy', description: null, fingerprint: null, handler: dummyMiddleware},
+                {name: 'Mock', description: null, fingerprint: null, handler: m1},
+                {name: 'Mock', description: null, fingerprint: null, handler: dummyMiddleware},
                 {name: 'anonymous_mware', description: null, fingerprint: null, handler: m3},
             ]);
             expect(productsPost?.middleware).toEqual([
-                {name: 'spy', description: null, fingerprint: null, handler: m1},
-                {name: 'spy', description: null, fingerprint: null, handler: dummyMiddleware},
+                {name: 'Mock', description: null, fingerprint: null, handler: m1},
+                {name: 'Mock', description: null, fingerprint: null, handler: dummyMiddleware},
                 {name: 'anonymous_mware', description: null, fingerprint: null, handler: m3},
             ]);
 
