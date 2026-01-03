@@ -5,16 +5,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **feat**: Route registration now supports setting up input validation schema.
+- **feat**: Global atomic store (accessed through `$.storeGet/Set/Del`) now supports **per-key TTLs (time-to-live)** and **reactive expiry events**. Entries automatically expire after their TTL, emit a `$store:{KEY}:expired` event, and cleanly remove themselves from memory and local storage.
+```typescript
+$.storeSet(key, value, {ttl?: number /* in milliseconds */, persist?: boolean});
+```
+
 ### Improved
-- **deps**: Upgrade @valkyriestudios/utils to 12.47.0
-- **deps**: Upgrade @cloudflare/workers-types to 4.20251014.0
-- **deps**: Upgrade @types/node to 22.18.2
-- **deps**: Upgrade @vitest/coverage-v8 to 4.0.4
-- **deps**: Upgrade bun-types to 1.3.1
-- **deps**: Upgrade eslint to 9.38.0
+- **deps**: Upgrade @valkyriestudios/utils to 12.48.0
+- **deps**: Upgrade @cloudflare/workers-types to 4.20260103.0
+- **deps**: Upgrade @types/node to 22.19.3
+- **deps**: Upgrade @vitest/coverage-v8 to 4.0.16
+- **deps**: Upgrade bun-types to 1.3.5
+- **deps**: Upgrade eslint to 9.39.2
+- **deps**: Upgrade prettier to 3.7.4
 - **deps**: Upgrade typescript to 5.9.3
-- **deps**: Upgrade typescript-eslint to 8.46.2
-- **deps**: Upgrade vitest to 4.0.4
+- **deps**: Upgrade typescript-eslint to 8.51.0
+- **deps**: Upgrade vitest to 4.0.16
+
+### Fixed
+- Fixed an edge-case issue where if an entry to the atomic-store was previously set using `persist: true` and then set using `persist: false` it would still linger in local storage and only be removed during `storeDel`.
+
+---
+
+### More about TTL expiry
+Each key now emits:
+- **$store:{KEY}**: On set or manual delete
+- **$store:{KEY}:expired**: When its TTL elapses naturally
+
+This makes the atomic store **time-aware and reactive**, enabling token renewal, cache invalidation, live dashboards, ... **without polling or background loops**.
+
+Atomic now natively handles **self-expiring state**, fully deterministic and zero-idle.
+
+**Additional notes**:
+- The provided TTL is **in milliseconds**
+- Like the `$store:{KEY}` events, the new `$store:{KEY}:expired` events are **fully typed**.
+- On expiry, **only** `$store:{KEY}:expired` is emitted, this prevents unnecessary updates for consumers of `$store:{KEY}`, allowing refresh logic to remain isolated..
+
+### Examples on TTL expiry
+##### Auth token refresh
+```typescript
+// Expire after 1 hour
+$.storeSet('token', 'abc123', { ttl: 3_600_000, persist: true });
+
+// Subscribe within a VM
+el.$subscribe('$store:token:expired', () => $.fetch('/auth/refresh'));
+```
+##### Dashboard auto-refresh
+```typescript
+async function load () {
+  // Fetch dashboard data (example)
+  const data = await $.fetch('/api/dashboard');
+
+  // Set and expire after 10 seconds
+  $.storeSet('dashboard_data', data, { ttl: 10_000 });
+}
+
+// Subscribe within a VM
+el.$subscribe('$store:dashboard_data:expired', load);
+```
 
 ## [1.4.1] - 2025-09-14
 ### Fixed
