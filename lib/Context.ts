@@ -66,8 +66,7 @@ export abstract class Context<
     Env extends Record<string, any> = {},
     State extends Record<string, unknown> = {},
     TInput extends TFInput = TFInput,
-> implements TriFrostContext<Env, State, TInput>
-{
+> implements TriFrostContext<Env, State, TInput> {
     /**
      * MARK: Private
      */
@@ -898,8 +897,8 @@ export abstract class Context<
                 const normalized = host.startsWith('http://')
                     ? 'https://' + host.slice(7)
                     : host.startsWith('http')
-                        ? host // eslint-disable-line prettier/prettier
-                        : 'https://' + host; // eslint-disable-line prettier/prettier
+                      ? host // eslint-disable-line prettier/prettier
+                      : 'https://' + host; // eslint-disable-line prettier/prettier
                 url = normalized.replace(/\/+$/, '') + '/' + url.replace(/^\/+/, '');
             }
 
