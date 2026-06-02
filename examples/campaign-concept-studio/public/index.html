@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Campaign Concept Studio</title>
+        <link rel="stylesheet" href="/styles.css" />
+    </head>
+    <body>
+        <main class="shell">
+            <section class="hero" aria-labelledby="studio-title">
+                <div class="eyebrow">OpenAI Responses API demo</div>
+                <div class="hero-grid">
+                    <div>
+                        <h1 id="studio-title">Campaign Concept Studio</h1>
+                        <p>
+                            Turn a compact brief into a campaign concept, channel-ready copy, launch steps,
+                            image prompts, and generated key visuals without exposing your API key to the browser.
+                        </p>
+                    </div>
+                    <div class="boundary-card" aria-label="Client and server boundary">
+                        <span>Client ↔ Server boundary</span>
+                        <strong>Browser submits inputs to <code>/api/campaign</code>.</strong>
+                        <small>Only the Node server calls OpenAI and returns sanitized results.</small>
+                    </div>
+                </div>
+            </section>
+
+            <section class="workspace">
+                <form id="campaign-form" class="brief-card">
+                    <div class="section-heading">
+                        <span>01</span>
+                        <div>
+                            <h2>Campaign brief</h2>
+                            <p>Provide the inputs your creative team would include in an intake form.</p>
+                        </div>
+                    </div>
+
+                    <label>
+                        Short campaign brief
+                        <textarea name="brief" rows="4" required placeholder="Launch our new refillable travel coffee system before summer vacation season."></textarea>
+                    </label>
+
+                    <label>
+                        Target audience
+                        <textarea name="audience" rows="3" required placeholder="Urban millennials and Gen Z commuters who care about convenience, design, and low-waste habits."></textarea>
+                    </label>
+
+                    <label>
+                        Product details
+                        <textarea name="product" rows="3" required placeholder="Insulated cup, subscription pods, leak-proof lid, 30-day starter bundle, available in four colors."></textarea>
+                    </label>
+
+                    <div class="form-row">
+                        <label>
+                            Tone
+                            <input name="tone" required placeholder="Optimistic, premium, practical" />
+                        </label>
+                        <label>
+                            Desired channels
+                            <input name="channels" required placeholder="Paid social, email, landing page, retail display" />
+                        </label>
+                    </div>
+
+                    <div class="actions">
+                        <button type="submit" id="generate-button">Generate campaign</button>
+                        <button type="button" id="sample-button" class="secondary">Use sample brief</button>
+                    </div>
+                </form>
+
+                <section class="results-card" aria-live="polite">
+                    <div id="empty-state" class="state-panel">
+                        <span class="state-icon">✦</span>
+                        <h2>Your campaign direction will appear here</h2>
+                        <p>Submit a brief to generate strategy, copy, launch planning, image prompts, and visuals.</p>
+                    </div>
+
+                    <div id="loading-state" class="state-panel hidden">
+                        <div class="spinner" aria-hidden="true"></div>
+                        <h2>Building campaign territory</h2>
+                        <p>Generating structured copy first, then using the image generation tool for key visuals.</p>
+                    </div>
+
+                    <div id="error-state" class="state-panel error hidden">
+                        <span class="state-icon">!</span>
+                        <h2>Generation failed</h2>
+                        <p id="error-message"></p>
+                    </div>
+
+                    <div id="results" class="results hidden">
+                        <div class="result-header">
+                            <div>
+                                <p class="eyebrow">Generated concept</p>
+                                <h2 id="concept-name"></h2>
+                            </div>
+                            <span id="model-pill" class="model-pill"></span>
+                        </div>
+
+                        <p id="concept-summary" class="concept-summary"></p>
+
+                        <div class="insight-grid">
+                            <article>
+                                <span>Core message</span>
+                                <p id="core-message"></p>
+                            </article>
+                            <article>
+                                <span>Rationale</span>
+                                <p id="rationale"></p>
+                            </article>
+                        </div>
+
+                        <section>
+                            <h3>Copy variants</h3>
+                            <div id="copy-list" class="copy-list"></div>
+                        </section>
+
+                        <section class="two-column">
+                            <div>
+                                <h3>Launch checklist</h3>
+                                <ol id="checklist" class="checklist"></ol>
+                            </div>
+                            <div>
+                                <h3>Strategy notes</h3>
+                                <ul id="strategy-notes" class="strategy-notes"></ul>
+                            </div>
+                        </section>
+
+                        <section>
+                            <h3>Image prompts and generated visuals</h3>
+                            <div id="image-grid" class="image-grid"></div>
+                        </section>
+                    </div>
+                </section>
+            </section>
+        </main>
+        <script src="/app.js" type="module"></script>
+    </body>
+</html>
