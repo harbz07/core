@@ -125,7 +125,7 @@ function createScrambler<T extends Record<string, any> = Record<string, any>>(op
                 }
             }
             return mutated ? result : input;
-        } else if (Object.prototype.toString.call(input) === '[object Object]') {
+        } else if (typeof input === 'object' && Object.prototype.toString.call(input) === '[object Object]') {
             let result: Record<string, any> | null = null;
             for (const key in input) {
                 const val = input[key];
@@ -133,7 +133,7 @@ function createScrambler<T extends Record<string, any> = Record<string, any>>(op
                 switch (typeof val) {
                     case 'string':
                     case 'number': {
-                        if ((paths !== null && paths.has(n_path) === true) || (props !== null && props.has(key) === true)) {
+                        if ((paths !== null && paths.has(n_path)) || (props !== null && props.has(key))) {
                             if (!result) result = {...input};
                             result![key] = repl;
                         } else if (values) {

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>World Room — realtime voice worldbuilding</title>
+        <link rel="stylesheet" href="./styles.css" />
+    </head>
+    <body>
+        <main class="shell">
+            <section class="hero" aria-labelledby="title">
+                <div class="eyebrow"><span class="star">✦</span> Realtime voice lab</div>
+                <h1 id="title">World Room</h1>
+                <p class="lede">
+                    Step into a low-latency audio studio for inventing settings, characters, conflicts, and scene hooks with a live
+                    worldbuilding companion.
+                </p>
+                <div class="orb" aria-hidden="true">
+                    <div class="ring ring-a"></div>
+                    <div class="ring ring-b"></div>
+                    <div class="core">WR</div>
+                </div>
+            </section>
+
+            <section class="panel controls" aria-label="Session controls">
+                <div class="status-grid">
+                    <div>
+                        <span class="label">Session</span>
+                        <strong id="sessionState">Idle</strong>
+                    </div>
+                    <div>
+                        <span class="label">Microphone</span>
+                        <strong id="micState">Off</strong>
+                    </div>
+                    <div>
+                        <span class="label">Companion</span>
+                        <strong id="voiceState">Waiting</strong>
+                    </div>
+                </div>
+
+                <div class="buttons">
+                    <button id="startButton" class="primary" type="button">Enter World Room</button>
+                    <button id="muteButton" type="button" disabled>Mute mic</button>
+                    <button id="stopButton" type="button" disabled>End session</button>
+                </div>
+
+                <div class="meter" aria-label="Microphone activity meter">
+                    <span id="meterBar"></span>
+                </div>
+
+                <p id="hint" class="hint">
+                    Press Enter World Room, allow microphone access, then describe a genre, mood, place, or character spark.
+                </p>
+            </section>
+
+            <section class="panel prompts" aria-labelledby="sparksTitle">
+                <h2 id="sparksTitle">Try a spark</h2>
+                <div class="spark-list">
+                    <button type="button" data-spark="Build me a floating city where memory is used as currency.">Floating city</button>
+                    <button type="button" data-spark="Help me invent a cozy-but-eerie forest kingdom with one dangerous secret.">
+                        Eerie forest
+                    </button>
+                    <button type="button" data-spark="Create three rival factions for a solar-system opera about forbidden maps.">
+                        Star factions
+                    </button>
+                </div>
+            </section>
+
+            <section class="panel transcript" aria-labelledby="transcriptTitle">
+                <div class="transcript-head">
+                    <h2 id="transcriptTitle">Live transcript</h2>
+                    <button id="clearButton" type="button">Clear</button>
+                </div>
+                <ol id="transcriptList" aria-live="polite"></ol>
+            </section>
+        </main>
+
+        <audio id="remoteAudio" autoplay></audio>
+        <script src="./app.js" type="module"></script>
+    </body>
+</html>

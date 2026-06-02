@@ -1,5 +1,5 @@
 import {LRU} from '@valkyriestudios/utils/caching';
-import {djb2Hash} from './Generic';
+import {djb2} from '@valkyriestudios/utils/hash';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', {fatal: true});
@@ -64,7 +64,7 @@ export function b64url(data: Uint8Array): string {
  * @param {string} input - URL-safe base64 string (with or without padding)
  * @returns Decoded binary data.
  */
-export function b64urlDecode(input: string): Uint8Array {
+export function b64urlDecode(input: string): Uint8Array<ArrayBuffer> {
     if (typeof input !== 'string') throw new TypeError('Crypto@b64urlDecode: Expected string input');
 
     const rem = input.length % 4;
@@ -91,7 +91,7 @@ export function b64urlDecode(input: string): Uint8Array {
  * @param {string} str - Text string to encode.
  * @returns UTF-8 encoded bytes.
  */
-export function utf8Encode(str: string): Uint8Array {
+export function utf8Encode(str: string): Uint8Array<ArrayBuffer> {
     if (typeof str !== 'string') throw new TypeError('Crypto@utf8Encode: Expected string');
     return encoder.encode(str);
 }
@@ -132,13 +132,7 @@ export async function importKey(
     if (key instanceof CryptoKey) return key;
 
     /* Generate an id for the key */
-    const id = [
-        algo.name,
-        (algo as any).hash!.name,
-        (algo as any).namedCurve || '',
-        usages.join('.'),
-        djb2Hash(typeof key === 'string' ? key : JSON.stringify(key)),
-    ].join(':');
+    const id = [algo.name, (algo as any).hash!.name, (algo as any).namedCurve || '', usages.join('.'), djb2(key)].join(':');
 
     /* If cached, return cached version */
     const cached = key_cache.get(id);
