@@ -1,5 +1,6 @@
-import {isObject} from '@valkyriestudios/utils/object';
+import {isNeObject, isObject} from '@valkyriestudios/utils/object';
 import {isNeString} from '@valkyriestudios/utils/string';
+import {hexId} from '@valkyriestudios/utils/hash';
 import {type TriFrostCache} from './modules/Cache';
 import {Cookies} from './modules/Cookies';
 import {NONCE_WIN_SCRIPT, NONCEMARKER} from './modules/JSX/ctx/nonce';
@@ -28,8 +29,10 @@ import {
     type TriFrostContextRenderOptions,
 } from './types/context';
 import {encodeFilename, extractDomainFromHost} from './utils/Http';
-import {determineHost, hexId, injectBefore, prependDocType} from './utils/Generic';
-import {type TriFrostBodyParserOptions, type ParsedBody} from './utils/BodyParser/types';
+import {determineHost, injectBefore, prependDocType} from './utils/Generic';
+import {type TriFrostBodyParserOptions} from './utils/BodyParser/types';
+import {type TFInput} from './types/validation';
+import toObject from './utils/Query';
 
 type RequestConfig = {
     method: HttpMethod;
@@ -59,8 +62,11 @@ export const IP_HEADER_CANDIDATES: string[] = [
     'x-appengine-user-ip',
 ];
 
-// eslint-disable-next-line prettier/prettier
-export abstract class Context<Env extends Record<string, any> = {}, State extends Record<string, unknown> = {}> implements TriFrostContext<Env, State> {
+export abstract class Context<
+    Env extends Record<string, any> = {},
+    State extends Record<string, unknown> = {},
+    TInput extends TFInput = TFInput,
+> implements TriFrostContext<Env, State, TInput> {
     /**
      * MARK: Private
      */
@@ -90,7 +96,10 @@ export abstract class Context<Env extends Record<string, any> = {}, State extend
     #cache: TriFrostCache | null = null;
 
     /* TriFrost Route Query. We compute this on an as-needed basis */
-    #query: URLSearchParams | null = null;
+    #query: TInput['query'] | null = null;
+
+    /* Whether or not a query exists */
+    #query_has: boolean = false;
 
     /* TriFrost logger instance */
     #logger: TriFrostLogger;
@@ -102,7 +111,7 @@ export abstract class Context<Env extends Record<string, any> = {}, State extend
     #timeout_id: any | null = null;
 
     /* Hooks to be executed after the context has finished */
-    #after: (() => Promise<void>)[] = [];
+    #after: (<S extends {}>(ctx: TriFrostContext<Env, S>) => Promise<void>)[] = [];
 
     /**
      * MARK: Protected
@@ -118,7 +127,7 @@ export abstract class Context<Env extends Record<string, any> = {}, State extend
     protected req_id: string | null = null;
 
     /* TriFrost Request body */
-    protected req_body: Readonly<ParsedBody> | null = null;
+    protected req_body: Readonly<TInput['body']> | null = null;
 
     /* Whether or not the context is initialized */
     protected is_initialized: boolean = false;
@@ -161,6 +170,9 @@ export abstract class Context<Env extends Record<string, any> = {}, State extend
             }
         }
         if (!this.req_id) this.req_id = hexId(16);
+
+        /* Set this.#query_has */
+        this.#query_has = this.req_config.query.length > 0;
 
         /* Instantiate logger */
         this.#logger = logger.spawn({
@@ -244,7 +256,7 @@ export abstract class Context<Env extends Record<string, any> = {}, State extend
      * Returns the host of the context.
      */
     get host(): string {
-        if (this.#host) return this.#host;
+        if (this.#host !== null) return this.#host;
         this.#host = this.getHostFromHeaders() ?? determineHost(this.ctx_config.env);
         return this.#host;
     }
@@ -282,9 +294,17 @@ export abstract class Context<Env extends Record<string, any> = {}, State extend
     /**
      * Request Query parameters
      */
-    get query(): Readonly<URLSearchParams> {
-        if (!this.#query) this.#query = new URLSearchParams(this.req_config.query);
+    get query(): Readonly<TInput['query']> {
+        if (!this.#query) {
+            this.#query = toObject(this.req_config.query);
+            this.#query_has = isNeObject(this.#query);
+        }
         return this.#query;
+    }
+
+    set query(val: TInput['query']) {
+        this.#query = val;
+        this.#query_has = isNeObject(val);
     }
 
     /**
@@ -302,7 +322,7 @@ export abstract class Context<Env extends Record<string, any> = {}, State extend
      * Cookies for context
      */
     get cookies(): Cookies {
-        if (!this.$cookies) this.$cookies = new Cookies(this as TriFrostContext, this.ctx_config.cookies);
+        if (!this.$cookies) this.$cookies = new Cookies(this as TriFrostContext<Env, State>, this.ctx_config.cookies);
         return this.$cookies;
     }
 
@@ -330,8 +350,12 @@ export abstract class Context<Env extends Record<string, any> = {}, State extend
     /**
      * Request Body
      */
-    get body(): Readonly<NonNullable<ParsedBody>> {
-        return this.req_body || {};
+    get body(): Readonly<NonNullable<TInput['body']>> {
+        return (this.req_body || {}) as unknown as Readonly<NonNullable<TInput['body']>>;
+    }
+
+    set body(val: TInput['body']) {
+        this.req_body = val;
     }
 
     /**
@@ -375,7 +399,7 @@ export abstract class Context<Env extends Record<string, any> = {}, State extend
     /**
      * Returns the currently registered after hooks
      */
-    get afterHooks(): (() => Promise<void>)[] {
+    get afterHooks(): (<S extends {}>(ctx: TriFrostContext<Env, S>) => Promise<void>)[] {
         return this.#after;
     }
 
@@ -532,7 +556,7 @@ export abstract class Context<Env extends Record<string, any> = {}, State extend
     /**
      * Initializes the request body and parses it into Json or FormData depending on its type
      */
-    async init(match: TriFrostRouteMatch<Env>, handler?: (config: TriFrostBodyParserOptions | null) => Promise<ParsedBody | null>) {
+    async init(match: TriFrostRouteMatch<Env>, handler?: (config: TriFrostBodyParserOptions | null) => Promise<TInput['body'] | null>) {
         try {
             /* No need to do anything if already initialized */
             if (this.is_initialized) return;
@@ -559,7 +583,7 @@ export abstract class Context<Env extends Record<string, any> = {}, State extend
                     if (body === null) {
                         this.setStatus(413);
                     } else {
-                        this.req_body = body;
+                        this.req_body = body as TInput['body'];
                     }
                     break;
                 }
@@ -648,9 +672,9 @@ export abstract class Context<Env extends Record<string, any> = {}, State extend
     /**
      * Register an after hook
      */
-    addAfter(fn: () => Promise<void>) {
+    addAfter<S extends {}>(fn: (ctx: TriFrostContext<Env, S>) => Promise<void>) {
         if (typeof fn !== 'function') return;
-        this.#after.push(fn);
+        this.#after.push(fn as any);
     }
 
     /**
@@ -660,7 +684,7 @@ export abstract class Context<Env extends Record<string, any> = {}, State extend
     /**
      * Render a JSX body to a string
      */
-    render(body: JSX.Element, opts?: TriFrostContextRenderOptions): string {
+    async render(body: JSX.Element, opts?: TriFrostContextRenderOptions): Promise<string> {
         return prependDocType(rootRender<Env, State>(this, body, isObject(opts) ? {...this.ctx_config, ...opts} : this.ctx_config));
     }
 
@@ -672,7 +696,7 @@ export abstract class Context<Env extends Record<string, any> = {}, State extend
             if (this.isLocked) throw new Error('Context@file: Cannot modify a finalized response');
 
             /* Cache Control */
-            if (opts?.cacheControl) ParseAndApplyCacheControl(this as TriFrostContext, opts.cacheControl);
+            if (opts?.cacheControl) ParseAndApplyCacheControl<Env, State>(this, opts.cacheControl);
 
             let stream: unknown;
             let size: number | null = null;
@@ -721,19 +745,19 @@ export abstract class Context<Env extends Record<string, any> = {}, State extend
     /**
      * Respond with HTML
      */
-    html(body: string | JSX.Element = '', opts?: TriFrostContextResponseOptions): void {
+    async html(body: string | JSX.Element = '', opts?: TriFrostContextResponseOptions): Promise<void> {
         try {
             /* Ensure we dont double write */
             if (this.isLocked) throw new Error('Context@html: Cannot modify a finalized response');
 
             /* Cache Control */
-            if (opts?.cacheControl) ParseAndApplyCacheControl(this, opts.cacheControl);
+            if (opts?.cacheControl) ParseAndApplyCacheControl<Env, State>(this, opts.cacheControl);
 
             /* Set mime type if no mime type was set already */
             if (!this.res_headers['content-type']) this.res_headers['content-type'] = MimeTypes.HTML;
 
             /* Render html */
-            let html = typeof body === 'string' ? body : this.render(body, this.ctx_config);
+            let html = typeof body === 'string' ? body : await this.render(body, this.ctx_config);
 
             /* Auto-prepend <!DOCTYPE html> if starts with <html */
             html = prependDocType(html.trimStart());
@@ -786,7 +810,7 @@ export abstract class Context<Env extends Record<string, any> = {}, State extend
                 throw new Error('Context@json: Invalid Payload');
 
             /* Cache Control */
-            if (opts?.cacheControl) ParseAndApplyCacheControl(this, opts.cacheControl);
+            if (opts?.cacheControl) ParseAndApplyCacheControl<Env, State>(this, opts.cacheControl);
 
             /* Set mime type if no mime type was set already */
             if (!this.res_headers['content-type']) this.res_headers['content-type'] = MimeTypes.JSON;
@@ -829,7 +853,7 @@ export abstract class Context<Env extends Record<string, any> = {}, State extend
             if (this.isLocked) throw new Error('Context@text: Cannot modify a finalized response');
 
             /* Cache Control */
-            if (opts?.cacheControl) ParseAndApplyCacheControl(this, opts.cacheControl);
+            if (opts?.cacheControl) ParseAndApplyCacheControl<Env, State>(this, opts.cacheControl);
 
             /* Set mime type if no mime type was set already */
             if (!this.res_headers['content-type']) this.res_headers['content-type'] = MimeTypes.TEXT;
@@ -873,15 +897,15 @@ export abstract class Context<Env extends Record<string, any> = {}, State extend
                 const normalized = host.startsWith('http://')
                     ? 'https://' + host.slice(7)
                     : host.startsWith('http')
-                        ? host // eslint-disable-line prettier/prettier
-                        : 'https://' + host; // eslint-disable-line prettier/prettier
+                      ? host // eslint-disable-line prettier/prettier
+                      : 'https://' + host; // eslint-disable-line prettier/prettier
                 url = normalized.replace(/\/+$/, '') + '/' + url.replace(/^\/+/, '');
             }
 
             /* If keep_query is passed as true and a query exists add it to normalized to */
-            if (this.query.size && opts?.keep_query !== false) {
+            if (this.#query_has && opts?.keep_query !== false) {
                 const prefix = url.indexOf('?') >= 0 ? '&' : '?';
-                url += prefix + this.query.toString();
+                url += prefix + this.req_config.query;
             }
 
             /* This is a redirect, as such a body should not be present */
