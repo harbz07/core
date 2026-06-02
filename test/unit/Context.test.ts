@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
-import {describe, it, expect, vi, beforeEach, afterEach} from 'vitest';
+import * as Hash from '@valkyriestudios/utils/hash';
+import {describe, it, expect, vi, beforeEach, afterEach, afterAll} from 'vitest';
 import {HttpMethods} from '../../lib/types/constants';
-import {hexId} from '../../lib/utils/Generic';
 import {Context, IP_HEADER_CANDIDATES} from '../../lib/Context';
 import {type TriFrostRootLogger} from '../../lib/modules/Logger/RootLogger';
 import {type TriFrostContextConfig} from '../../lib/types/context';
@@ -35,7 +35,7 @@ class TestContext extends Context {
         const hooks = this.afterHooks;
         for (let i = 0; i < hooks.length; i++) {
             try {
-                hooks[i]();
+                hooks[i]({} as any);
             } catch {
                 /* No-Op */
             }
@@ -47,7 +47,7 @@ describe('Context', () => {
     let ctx: TestContext;
     const mockLogger = {
         spawn: vi.fn().mockReturnValue({
-            traceId: hexId(16),
+            traceId: Hash.hexId(16),
             setAttributes: vi.fn(),
             span: vi.fn((_, fn) => fn()),
             error: vi.fn(),
@@ -71,6 +71,10 @@ describe('Context', () => {
 
     beforeEach(() => {
         ctx = new TestContext(mockLogger as any, baseConfig as any, baseRequest);
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
 
     describe('Constructor', () => {
@@ -403,7 +407,7 @@ describe('Context', () => {
                 calls.push('two');
             });
 
-            await Promise.all(ctx.afterHooks.map(fn => fn()));
+            await Promise.all(ctx.afterHooks.map(fn => fn(ctx)));
             expect(calls).toEqual(['one', 'two']);
         });
 
@@ -425,8 +429,8 @@ describe('Context', () => {
                 ...baseRequest,
                 query: 'foo=bar&baz=1',
             });
-            expect(c2.query.get('foo')).toBe('bar');
-            expect(c2.query.get('baz')).toBe('1');
+            expect(c2.query.foo).toBe('bar');
+            expect(c2.query.baz).toBe(1);
         });
     });
 
@@ -1030,6 +1034,7 @@ describe('Context', () => {
             });
 
             const logSpy = vi.spyOn(putCtx.logger, 'error');
+            logSpy.mockClear();
 
             await putCtx.init(
                 {
@@ -1374,8 +1379,8 @@ describe('Context', () => {
     });
 
     describe('html()', () => {
-        it('Responds with HTML string', () => {
-            ctx.html('<html><body>Hello</body></html>');
+        it('Responds with HTML string', async () => {
+            await ctx.html('<html><body>Hello</body></html>');
             /* @ts-expect-error Should be good */
             expect(ctx.res_body?.startsWith('<!DOCTYPE html><html>')).toBe(true);
             /* @ts-expect-error Should be good */
@@ -1383,22 +1388,22 @@ describe('Context', () => {
             expect(ctx.isDone).toBe(true);
         });
 
-        it('Renders JSXElement using rootRender', () => {
+        it('Renders JSXElement using rootRender', async () => {
             const jsxElement = {type: 'div', props: {children: 'World'}};
-            ctx.html(jsxElement as any);
+            await ctx.html(jsxElement as any);
             /* @ts-expect-error Should be good */
             expect(ctx.res_body).toContain('<div>World</div>');
         });
 
-        it('Respects Content-Type if already set', () => {
+        it('Respects Content-Type if already set', async () => {
             ctx.setHeader('content-type', 'application/xhtml+xml');
-            ctx.html('<html><body>Hi</body></html>');
+            await ctx.html('<html><body>Hi</body></html>');
             /* @ts-expect-error Should be good */
             expect(ctx.res_headers['content-type']).toBe('application/xhtml+xml');
         });
 
-        it('Sets Cache-Control from options', () => {
-            ctx.html('<div>HTML</div>', {
+        it('Sets Cache-Control from options', async () => {
+            await ctx.html('<div>HTML</div>', {
                 cacheControl: {
                     type: 'public',
                     maxage: 600,
@@ -1409,9 +1414,9 @@ describe('Context', () => {
             expect(ctx.res_headers['cache-control']).toBe('public, max-age=600, proxy-revalidate');
         });
 
-        it('Overwrites manually-set Cache-Control', () => {
+        it('Overwrites manually-set Cache-Control', async () => {
             ctx.setHeader('cache-control', 'fixed');
-            ctx.html('<span>Should change</span>', {
+            await ctx.html('<span>Should change</span>', {
                 cacheControl: {
                     type: 'no-store',
                 },
@@ -1420,30 +1425,30 @@ describe('Context', () => {
             expect(ctx.res_headers['cache-control']).toBe('no-store');
         });
 
-        it('Skips if cacheControl is not passed', () => {
-            ctx.html('<em>Simple</em>');
+        it('Skips if cacheControl is not passed', async () => {
+            await ctx.html('<em>Simple</em>');
             /* @ts-expect-error Should be good */
             expect(ctx.res_headers['cache-control']).toBeUndefined();
         });
 
-        it('Adds doctype if HTML starts with <html', () => {
-            ctx.html('<html><head></head><body></body></html>');
+        it('Adds doctype if HTML starts with <html', async () => {
+            await ctx.html('<html><head></head><body></body></html>');
             /* @ts-expect-error Should be good */
             expect(ctx.res_body).toBe('<!DOCTYPE html><html><head></head><body></body></html>');
         });
 
-        it('Preserves previously set status', () => {
+        it('Preserves previously set status', async () => {
             ctx.setStatus(418);
-            ctx.html('<html><body></body></html>');
+            await ctx.html('<html><body></body></html>');
             expect(ctx.statusCode).toBe(418);
         });
 
-        it('Injects nonce script and cookie on full-page HTML with CSP', () => {
+        it('Injects nonce script and cookie on full-page HTML with CSP', async () => {
             const html = '<!DOCTYPE html><html><head></head><body><h1>Hello</h1></body></html>';
             const spySetCookie = vi.spyOn(ctx.cookies, 'set');
 
             ctx.setHeader('content-security-policy', "script-src 'self' 'nonce-abc123'");
-            ctx.html(html);
+            await ctx.html(html);
 
             const expectedNonce = ctx.nonce;
             /* @ts-expect-error Should be good */
@@ -1469,12 +1474,12 @@ describe('Context', () => {
             );
         });
 
-        it('Rewrites nonce attributes and CSP on fragment HTML', () => {
+        it('Rewrites nonce attributes and CSP on fragment HTML', async () => {
             const fragment = '<div><style nonce="xyz">.test{}</style></div>';
             ctx.cookies.set('tfnonce', 'noncified');
             ctx.setHeader('content-security-policy', "style-src 'self' 'nonce-xyz'");
 
-            ctx.html(fragment);
+            await ctx.html(fragment);
 
             const expectedNonce = ctx.nonce;
             /* @ts-expect-error Should be good */
@@ -1483,12 +1488,12 @@ describe('Context', () => {
             expect(ctx.res_headers['content-security-policy']).toBe("style-src 'self' 'nonce-noncified'");
         });
 
-        it('Does not rewrite nonce attributes if no tfnonce is set for fragment HTML', () => {
+        it('Does not rewrite nonce attributes if no tfnonce is set for fragment HTML', async () => {
             const fragment = '<div><style nonce="xyz">.test{}</style></div>';
             ctx.setState({nonce: 'xyz'});
             ctx.setHeader('content-security-policy', "style-src 'self' 'nonce-xyz'");
 
-            ctx.html(fragment);
+            await ctx.html(fragment);
 
             /* @ts-expect-error Should be good */
             expect(ctx.res_body).toBe(['<div>', '<style nonce="xyz">.test{}</style></div>'].join(''));
@@ -1496,16 +1501,16 @@ describe('Context', () => {
             expect(ctx.res_headers['content-security-policy']).toBe("style-src 'self' 'nonce-xyz'");
         });
 
-        it('Skips nonce injection if CSP is missing', () => {
+        it('Skips nonce injection if CSP is missing', async () => {
             const html = '<!DOCTYPE html><html><body>OK</body></html>';
-            ctx.html(html);
+            await ctx.html(html);
             /* @ts-expect-error Should be good */
             expect(ctx.res_body).not.toContain('window.$tfnonce');
         });
 
-        it('Throws if context is locked', () => {
+        it('Throws if context is locked', async () => {
             ctx.end();
-            ctx.html('<p>Too late</p>');
+            await ctx.html('<p>Too late</p>');
             expect(ctx.logger.error).toHaveBeenCalledWith(new Error('Context@html: Cannot modify a finalized response'), {
                 body: '<p>Too late</p>',
                 opts: undefined,
@@ -2086,7 +2091,7 @@ describe('Context', () => {
             const jsx = {type: 'span', props: {children: 'Custom'}};
             const spy = vi.spyOn(await import('../../lib/modules/JSX/render'), 'rootRender').mockReturnValue('<span>Custom</span>');
 
-            const result = ctx.render(jsx as any, configOverride as any);
+            const result = await ctx.render(jsx as any, configOverride as any);
             expect(result).toBe('<span>Custom</span>');
             expect(spy).toHaveBeenCalledWith(ctx, jsx, configOverride);
 
@@ -2096,7 +2101,7 @@ describe('Context', () => {
         it('Returns result even when JSX is empty', async () => {
             const jsx = {} as any;
             const spy = vi.spyOn(await import('../../lib/modules/JSX/render'), 'rootRender').mockReturnValue('<!empty>');
-            const result = ctx.render(jsx);
+            const result = await ctx.render(jsx);
             expect(result).toBe('<!empty>');
             spy.mockRestore();
         });
@@ -2115,7 +2120,7 @@ describe('Context', () => {
                 .spyOn(await import('../../lib/modules/JSX/render'), 'rootRender')
                 .mockReturnValue('<style-test>test</style-test>');
 
-            ctx.render(jsx as any, overrideOpts as any);
+            await ctx.render(jsx as any, overrideOpts as any);
             expect(rootRender).toHaveBeenCalledWith(ctx, jsx, expect.objectContaining(overrideOpts));
 
             rootRender.mockRestore();
@@ -2124,7 +2129,7 @@ describe('Context', () => {
         it('Prepends with DOCTYPE if full page html', async () => {
             const configOverride = {env: {}, cookies: {}, cache: null, trustProxy: false};
             const jsx = {type: 'html', props: {children: {type: 'span', props: {children: 'Custom'}}}};
-            const result = ctx.render(jsx as any, configOverride as any);
+            const result = await ctx.render(jsx as any, configOverride as any);
             expect(result).toBe(
                 `<!DOCTYPE html><html><span>Custom</span><script nonce="${ctx.nonce}">${ARC_GLOBAL(false)}${ARC_GLOBAL_OBSERVER}</script></html>`,
             );
@@ -2153,7 +2158,7 @@ describe('Context', () => {
 
             const rootRender = vi.spyOn(await import('../../lib/modules/JSX/render'), 'rootRender').mockReturnValue('<span>Merged</span>');
 
-            const result = ctxWithConfig.render(jsx as any, override as any);
+            const result = await ctxWithConfig.render(jsx as any, override as any);
 
             expect(result).toBe('<span>Merged</span>');
             expect(rootRender).toHaveBeenCalledWith(ctxWithConfig, jsx, merged);

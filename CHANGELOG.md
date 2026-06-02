@@ -4,6 +4,172 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+- **feat**: Route registration now supports setting up input validation schema.
+- **feat**: Global atomic store (accessed through `$.storeGet/Set/Del`) now supports **per-key TTLs (time-to-live)** and **reactive expiry events**. Entries automatically expire after their TTL, emit a `$store:{KEY}:expired` event, and cleanly remove themselves from memory and local storage.
+```typescript
+$.storeSet(key, value, {ttl?: number /* in milliseconds */, persist?: boolean});
+```
+
+### Improved
+- **deps**: Upgrade @valkyriestudios/utils to 12.48.0
+- **deps**: Upgrade @cloudflare/workers-types to 4.20260103.0
+- **deps**: Upgrade @types/node to 22.19.3
+- **deps**: Upgrade @vitest/coverage-v8 to 4.0.16
+- **deps**: Upgrade bun-types to 1.3.5
+- **deps**: Upgrade eslint to 9.39.2
+- **deps**: Upgrade prettier to 3.7.4
+- **deps**: Upgrade typescript to 5.9.3
+- **deps**: Upgrade typescript-eslint to 8.51.0
+- **deps**: Upgrade vitest to 4.0.16
+
+### Fixed
+- Fixed an edge-case issue where if an entry to the atomic-store was previously set using `persist: true` and then set using `persist: false` it would still linger in local storage and only be removed during `storeDel`.
+
+---
+
+### More about TTL expiry
+Each key now emits:
+- **$store:{KEY}**: On set or manual delete
+- **$store:{KEY}:expired**: When its TTL elapses naturally
+
+This makes the atomic store **time-aware and reactive**, enabling token renewal, cache invalidation, live dashboards, ... **without polling or background loops**.
+
+Atomic now natively handles **self-expiring state**, fully deterministic and zero-idle.
+
+**Additional notes**:
+- The provided TTL is **in milliseconds**
+- Like the `$store:{KEY}` events, the new `$store:{KEY}:expired` events are **fully typed**.
+- On expiry, **only** `$store:{KEY}:expired` is emitted, this prevents unnecessary updates for consumers of `$store:{KEY}`, allowing refresh logic to remain isolated..
+
+### Examples on TTL expiry
+##### Auth token refresh
+```typescript
+// Expire after 1 hour
+$.storeSet('token', 'abc123', { ttl: 3_600_000, persist: true });
+
+// Subscribe within a VM
+el.$subscribe('$store:token:expired', () => $.fetch('/auth/refresh'));
+```
+##### Dashboard auto-refresh
+```typescript
+async function load () {
+  // Fetch dashboard data (example)
+  const data = await $.fetch('/api/dashboard');
+
+  // Set and expire after 10 seconds
+  $.storeSet('dashboard_data', data, { ttl: 10_000 });
+}
+
+// Subscribe within a VM
+el.$subscribe('$store:dashboard_data:expired', load);
+```
+
+## [1.4.1] - 2025-09-14
+### Fixed
+- Fix issue where hexId is no longer compatible with workerd runtime due to global crypto usage (which is not allowed unless within handler)
+
+## [1.4.0] - 2025-09-14
+We hadn’t looked at JSX rendering performance since TriFrost [0.23.0](https://www.trifrost.dev/news/releases/0.23.0) (where we introduced a solid performance boost). As usual, stepping back for a while and then taking a fresh look revealed more opportunities for improvement.
+
+### Improved
+- **perf**: Improved JSX render engine performance by anywhere from 15% to 49%
+- **deps**: Upgrade @cloudflare/workers-types to 4.20250913.0
+- **deps**: Upgrade @types/node to 22.18.3
+- **deps**: Upgrade @valkyriestudios/utils to 12.45.0
+- **deps**: Upgrade bun-types to 1.2.21
+- **deps**: Upgrade eslint to 9.35.0
+- **deps**: Upgrade typescript-eslint to 8.43.0
+
+---
+
+We’ve got more lined up for future versions, so keep your eyes open and go ship something cool.
+
+As always. Stay frosty ❄️
+
+## [1.3.0] - 2025-08-15
+This release introduces `ctx()`, a lightweight utility with big ambitions. Access the active request context from anywhere in your code, no need to pass it through every method.
+
+In addition, smarter `@cache` and `@span` decorators, enhanced `afterHooks` and some much-needed love for Windows developers.
+
+### Added
+- **feat**: `ctx()` utility, available via `import {ctx} from '@trifrost/core'`, which returns the active `TriFrostContext` for the **current request**. No more manual parameter threading, you can now access `ctx()` anywhere in your request lifecycle:
+```ts
+import {ctx} from '@trifrost/core';
+
+export async function doSomething() {
+  ctx().logger.info('Hello from anywhere!');
+}
+```
+
+### Improved
+- **feat**: [Added support to run scripts on Windows machines](https://github.com/trifrost-js/core/pull/3) by [@dennishavermans](https://github.com/dennishavermans)
+- **feat**: Internal context tracking now uses **AsyncLocalStorage** under the hood, enabling request-scoped data access across the entire call stack (see Added).
+- **feat**: `afterHooks` (added through `.addAfter`, which get run after the request finishes) now receive the `context` instance, allowing hooks to inspect context state or perform additional actions using the context without being tied to request lifetime. **Important to note that the AsyncLocalStorage context is not available in after hooks**.
+```ts
+app.get('/hello', ctx => {
+  ctx.addAfter(context => {
+    context.logger.info(`Response sent with status ${context.statusCode}`);
+  });
+  return 'Hello World';
+});
+```
+- **feat**: `@cache` and `@span` decorators no longer require ctx to be passed and will tap into the active context coming from **AsyncLocalStorage** (using the new `ctx()` util, see Added)
+```ts
+import {cache, span} from '@trifrost/core';
+
+class Example {
+  @cache('user:123') // ctx not required
+  async fetchUser() {
+    return await db.getUser(123);
+  }
+
+  @span('expensive-op') // ctx not required
+  async doWork() { /* ... */ }
+}
+```
+```ts
+import {cache, span, ctx} from '@trifrost/core';
+import {type Context} from '~/types';
+
+class UserService {
+  @cache(() => `user:${(ctx() as Context<{id:string}>).state.id}`) // ctx() here for dynamic key
+  @span('fetch-user')
+  async getUser() {
+    const context = ctx() as Context<{id:string}>; // full access to request context
+    context.logger.info(`Fetching user ${context.state.id}`);
+    return await db.getUser(context.state.id);
+  }
+}
+```
+- **feat**: `cacheFn` and `spanFn` helpers no longer require ctx to be passed and will tap into the active context coming from **AsyncLocalStorage** (using the new `ctx()` util, see Added)
+```ts
+import {cacheFn, spanFn} from '@trifrost/core';
+
+const getData = cacheFn('data-key')(async () => fetchData());
+const process = spanFn('processing')(async () => doProcessing());
+```
+- **misc**: Migrated to TypeScript 5.9 and updated types to align with [lib.d.ts changes](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-5-9.html#libdts-changes)
+- **deps**: Upgrade @cloudflare/workers-types to 4.20250813.0
+- **deps**: Upgrade @types/node to 22.17.2
+- **deps**: Upgrade bun-types to 1.2.20
+- **deps**: Upgrade eslint to 9.33.0
+- **deps**: Upgrade eslint-plugin-prettier to 5.5.4
+- **deps**: Upgrade typescript to 5.9.2
+- **deps**: Upgrade typescript-eslint to 8.39.1
+
+### Announcements
+- First community contribution by [@dennishavermans](https://github.com/dennishavermans) 🎉
+
+---
+
+This one’s all about making TriFrost feel lighter in the hands and sharper at the edges. The less you fight with boilerplate, the more you can focus on building things that matter.
+
+We’ve got more lined up, so keep your eyes open and go ship something cool.
+
+As always. Stay frosty ❄️
+
 ## [1.2.1] - 2025-07-22
 ### Improved
 - **feat**: Enhanced `$.goto` with ergonomic support for query-only shorthands. If the URL starts with `?`, the current `location.pathname` is automatically prepended. Example:
