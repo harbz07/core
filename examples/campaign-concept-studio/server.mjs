@@ -1,5 +1,5 @@
 import http from 'node:http';
-import {readFile} from 'node:fs/promises';
+import {readFile, stat} from 'node:fs/promises';
 import {extname, join, normalize} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -92,15 +92,25 @@ function sendJson(res, status, payload) {
 function readRequestBody(req) {
     return new Promise((resolve, reject) => {
         let body = '';
+        let isTooLarge = false;
         req.setEncoding('utf8');
         req.on('data', chunk => {
-            body += chunk;
-            if (body.length > 50_000) {
-                reject(new Error('Request body is too large.'));
-                req.destroy();
+            if (isTooLarge) return;
+            if (body.length + chunk.length > 50_000) {
+                isTooLarge = true;
+                return;
             }
+
+            body += chunk;
         });
-        req.on('end', () => resolve(body));
+        req.on('end', () => {
+            if (isTooLarge) {
+                reject(new Error('Request body is too large.'));
+                return;
+            }
+
+            resolve(body);
+        });
         req.on('error', reject);
     });
 }
@@ -243,16 +253,31 @@ async function handleCampaign(req, res) {
         });
     } catch (error) {
         console.error(error);
-        sendJson(res, 500, {
-            error: error instanceof SyntaxError ? 'Request JSON was invalid.' : 'Campaign generation failed. Check the server logs and OpenAI project access.',
-        });
+        if (error instanceof SyntaxError) {
+            sendJson(res, 400, {error: 'Request JSON was invalid.'});
+            return;
+        }
+
+        if (error instanceof Error && error.message === 'Request body is too large.') {
+            sendJson(res, 413, {error: 'Request body is too large.'});
+            return;
+        }
+
+        sendJson(res, 500, {error: 'Campaign generation failed. Check the server logs and OpenAI project access.'});
     }
 }
 
 async function serveStatic(req, res) {
     const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
     const requestedPath = url.pathname === '/' ? '/index.html' : url.pathname;
-    const normalizedPath = normalize(decodeURIComponent(requestedPath)).replace(/^\.\.(\/|\\|$)/, '');
+    let normalizedPath;
+    try {
+        normalizedPath = normalize(decodeURIComponent(requestedPath)).replace(/^\.\.(\/|\\|$)/, '');
+    } catch {
+        res.writeHead(400, {'content-type': 'text/plain; charset=utf-8'});
+        res.end('Bad request');
+        return;
+    }
     const filePath = join(publicDir, normalizedPath);
 
     if (!filePath.startsWith(publicDir)) {
@@ -262,11 +287,20 @@ async function serveStatic(req, res) {
     }
 
     try {
-        const file = await readFile(filePath);
-        res.writeHead(200, {
+        const headers = {
             'content-type': mimeTypes.get(extname(filePath)) || 'application/octet-stream',
             'cache-control': requestedPath === '/index.html' ? 'no-store' : 'public, max-age=3600',
-        });
+        };
+
+        if (req.method === 'HEAD') {
+            const fileInfo = await stat(filePath);
+            res.writeHead(200, {...headers, 'content-length': String(fileInfo.size)});
+            res.end();
+            return;
+        }
+
+        const file = await readFile(filePath);
+        res.writeHead(200, headers);
         res.end(file);
     } catch {
         res.writeHead(404, {'content-type': 'text/plain; charset=utf-8'});
