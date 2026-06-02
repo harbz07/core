@@ -96,10 +96,12 @@ function readRequestBody(req) {
         req.setEncoding('utf8');
         req.on('data', chunk => {
             if (isTooLarge) return;
-            body += chunk;
-            if (body.length > 50_000) {
+            if (body.length + chunk.length > 50_000) {
                 isTooLarge = true;
+                return;
             }
+
+            body += chunk;
         });
         req.on('end', () => {
             if (isTooLarge) {
